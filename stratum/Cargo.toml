@@ -1,0 +1,41 @@
+[package]
+name = "pool"
+version = "0.1.0"
+authors = ["bdoyle"]
+
+[[bin]]
+name = "grin-pool"
+path = "src/main.rs"
+
+[dependencies]
+bufstream = "0.1"
+rustc-serialize = "*"
+jsonrpc-core = "~4.0"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+log = "0.4"
+log4rs = { version = "0.8.1", features = ["rolling_file_appender", "compound_policy", "size_trigger", "fixed_window_roller"] }
+backtrace = "0.3"
+time = "0.1"
+lazy_static = "0.2"
+toml = "0.4"
+reqwest = "0.9.4"
+blake2-rfc = "0.2"
+rand = "0.6.5"
+byteorder = "1.3.1"
+redis = "0.9.0"
+queues = "1.0.0"
+failure = "0.1.5"
+#grin_core = "3.1.0"
+#grin_util = "3.1.0"
+grin_core = { git = "https://github.com/mimblewimble/grin.git", tag = "v3.1.0"}
+grin_util = "3.1.0"
+
+[dependencies.grin_secp256k1zkp]
+#git = "https://github.com/mimblewimble/rust-secp256k1-zkp"
+#tag = "grin_integration_29"
+#path = "../../rust-secp256k1-zkp"
+version = "=0.7.7"
+features = ["bullet-proof-sizing"]
+
