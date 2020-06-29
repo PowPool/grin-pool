@@ -27,7 +27,6 @@ port = 6379
 # Configuration for access to upstream grin node
 [grin_node]
 address = "grin"
-api_port = 3413
 stratum_port = 3416
 login = "GrinPool"
 password = ""

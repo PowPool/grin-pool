@@ -460,36 +460,6 @@ impl Worker {
         return Err("Login Failed to get your ID, please visit https://GrinPool.com and create an account".to_string());
     }
 
-    /// Worker Stats - NOT USED CURRENTLY
-    pub fn get_worker_stats(&mut self, login_params: LoginParams) -> Result<(), String> {
-        //
-        // Get the workers stats
-        // XXX DO WE NEED NBMINER workaround still ????
-        let client = reqwest::Client::new();
-        let mut response = client
-            .get(format!("http://poolapi:{}/worker/stats/{}/0,1", self.config.grin_node.api_port, self.user_id).as_str())
-            .basic_auth(login_params.login.clone(), Some(login_params.pass.clone()))
-            .send(); // This could be Err
-        match response {
-            Err(e) => {
-                debug!("Worker {} - Unable to fetch worker stats data", self.user_id);
-                // Failed to get stats, but this is not fatal
-            },
-            Ok(mut result) => {
-                if result.status().is_success() {
-                    // Fill in worker stats with this data
-                    // XXX TODO
-                    let stats_json: Value = result.json().unwrap();
-                    debug!("Worker stats: {:?}", stats_json);
-                    //self.status.accepted =  stats_json["total_shares_processed"].as_u64().unwrap();
-                } else {
-                    warn!("Failed to get user stats: {}", result.status());
-                }
-            }
-        }
-        return Ok(());
-    }
-
 
     /// Get and process messages from the connected worker
     // Method to handle requests from the downstream worker

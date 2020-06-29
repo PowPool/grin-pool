@@ -51,7 +51,7 @@ fn main() {
 
     init_logger();
 
-    warn!("Startng Grin-Pool");
+    warn!("Starting Grin-Pool");
 
     let config = config::read_config();
 

@@ -49,7 +49,6 @@ pub struct WorkerConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct NodeConfig {
     pub address: String,
-    pub api_port: u64,
     pub stratum_port: u64,
     pub login: String,
     pub password: String,
