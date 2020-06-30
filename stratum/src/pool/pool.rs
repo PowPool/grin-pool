@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
+use std::time::SystemTime;
 use std::{thread, time};
 use rand::Rng;
 
@@ -138,11 +139,17 @@ pub struct Pool {
     duplicates: HashMap<Vec<u64>, usize>, // pow vector, worker id who first submitted it
     job_versions: HashMap<u64, String>,   // pre_pow string, job_id version
     chain_type: ChainTypes,
+    next_reset_timestamp: u64
 }
 
 impl Pool {
     /// Create a new Grin Stratum Pool
     pub fn new(config: Config) -> Pool {
+        let time_now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(n) => n.as_secs(),
+            Err(_) => 0,
+        };
+
         Pool {
             id: "Grin Pool".to_string(),
             job: JobTemplate::new(),
@@ -153,6 +160,7 @@ impl Pool {
             duplicates: HashMap::new(),
             job_versions: HashMap::new(),
             chain_type: pool_to_chaintype(config.grin_pool.pool.clone()),
+            next_reset_timestamp: ((time_now / 60) + 1) * 60
         }
     }
 
@@ -213,6 +221,10 @@ impl Pool {
 
             // Delete workers in error state
             let _num_active_workers = self.clean_workers();
+
+            // Do data persistence of shares in the latest one minute for all workers
+            // and then reset shares info for all workers
+            let _ = self.save_and_reset_shares_1m();
 
             thread::sleep(time::Duration::from_millis(1));
         }
@@ -331,6 +343,7 @@ impl Pool {
                             );
                             worker.status.rejected += 1;
                             worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
+                            worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502);
                             continue; // Dont process this share anymore
                         } else {
@@ -347,7 +360,6 @@ impl Pool {
                         //     worker.send_err("submit".to_string(), "Invalid POW size".to_string(), -32502);
                         //     continue; // Dont process this share anymore
                         // }
-
 
                         if share.edge_bits != self.config.grin_pool.edge_bits {
                             // Invalid Size
@@ -370,6 +382,7 @@ impl Pool {
                             warn!("Share is stale {} vs {}", share.height, self.job.height);
                             worker.status.stale += 1;
                             worker.add_shares(share.edge_bits, 0, 0, 1); // Accepted, Rejected, Stale
+                            worker.add_shares_1m(share.edge_bits, 0, 0, 1); // Accepted, Rejected, Stale
                             worker.send_err("submit".to_string(), "Solution submitted too late".to_string(), -32503);
                             continue; // Dont process this share anymore
                         }
@@ -381,6 +394,7 @@ impl Pool {
                             None => {
                                 worker.status.rejected += 1;
                                 worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
+                                worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                                 continue // Dont process this share anymore
                             },
                             Some(pre_pow) => {
@@ -393,6 +407,7 @@ impl Pool {
                                     Err(e) => { 
                                         worker.status.rejected += 1;
                                         worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
+                                        worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                                         debug!(
                                             "{} - Rejected mismatched block header: {}",
                                             self.id,
@@ -408,6 +423,7 @@ impl Pool {
                                 if ! verify_result.is_ok() {
                                         worker.status.rejected += 1;
                                         worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
+                                        worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                                         debug!(
                                             "{} - Rejected due to failed grin_core::pow::verify_size()",
                                             self.id,
@@ -433,18 +449,21 @@ impl Pool {
                         if difficulty < 1 {
                             worker.status.rejected += 1;
                             worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
+                            worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.send_err("submit".to_string(), "Rejected low difficulty solution".to_string(), -32502);
                             continue; // Dont process this share anymore
                         }
                         if difficulty < worker.status.difficulty {
                             worker.status.rejected += 1;
                             worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
+                            worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502);
                             continue; // Dont process this share anymore
                         }
                         if difficulty >= worker.status.difficulty {
                             worker.status.accepted += 1;
                             worker.add_shares(share.edge_bits, 1, 0, 0); // Accepted, Rejected, Stale
+                            worker.add_shares_1m(share.edge_bits, 1, 0, 0); // Accepted, Rejected, Stale
                             worker.send_ok("submit".to_string());
                         }
                         // This is a good share, send it to grin server to be submitted
@@ -496,7 +515,6 @@ impl Pool {
                 debug!("{:?}", worker.worker_shares);
                 worker.send_job(&mut self.job.clone());
 
-                // TODO: need to add shares persistence
                 worker.reset_worker_shares(self.job.height, self.difficulty);
             }
         }
@@ -522,6 +540,18 @@ impl Pool {
             let _ = w_m.remove(&worker_uuid);
         }
         return w_m.len();
+    }
+
+    fn save_and_reset_shares_1m(&mut self) {
+        let time_now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(n) => n.as_secs(),
+            Err(_) => 0,
+        };
+
+        if time_now >= self.next_reset_timestamp {
+            self.next_reset_timestamp = ((time_now / 60) + 1) * 60;
+            debug!("now: {}, next: {}", time_now, self.next_reset_timestamp);
+        }
     }
 
 }

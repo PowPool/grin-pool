@@ -198,7 +198,29 @@ impl Worker {
             self.worker_shares.shares.insert(size, shares);
         }
     }
-    
+
+    /// Add a share to the worker_shares_1m
+    pub fn add_shares_1m(&mut self, size: u32, accepted: u64, rejected: u64, stale: u64) {
+        if self.worker_shares_1m.shares.contains_key(&size) {
+            match self.worker_shares_1m.shares.get_mut(&size) {
+                Some(mut shares) => {
+                    shares.accepted += accepted;
+                    shares.rejected += rejected;
+                    shares.stale += stale;
+                },
+                None => {
+                    // This cant happen
+                }
+            }
+        } else {
+            let mut shares: Shares = Shares::new(size);
+            shares.accepted = accepted;
+            shares.rejected = rejected;
+            shares.stale = stale;
+            self.worker_shares_1m.shares.insert(size, shares);
+        }
+    }
+
     /// Send a response
     pub fn send_response(&mut self,
                          method: String,
