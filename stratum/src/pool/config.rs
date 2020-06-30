@@ -36,6 +36,7 @@ pub struct PortDifficulty {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PoolConfig {
+    pub edge_bits: u32,
     pub log_dir: String,
     pub pool: String,
 }
@@ -60,7 +61,6 @@ pub struct NodeConfig {
 //     pub port: u64,
 // }
 
-
 pub fn read_config() -> Config {
     let mut config_file = File::open(CONFIG_FILE_NAME).expect("Config file not found");
     let mut toml_str = String::new();
@@ -73,8 +73,6 @@ pub fn read_config() -> Config {
     match env::var("DIFFICULTY") {
         Ok(difficulty) => {
             config.workers.port_difficulty.difficulty = difficulty.parse().unwrap() ;
-            println!("env difficulty: {:?}", config);
-
         }
         Err(e) => {}
     }
@@ -82,26 +80,24 @@ pub fn read_config() -> Config {
     match env::var("GRIN_ADDRESS") {
         Ok(address) => {
             config.grin_node.address = address;
-            println!("env address: {:?}", config);
         }
         Err(e) => {}
     }
 
-    // match env::var("REDIS_PORT") {
-    //     Ok(port) => {
-    //         config.redis.port = port.parse::<u64>().unwrap();
-    //         println!("env redis: {:?}", config.redis);
-    //     }
-    //     Err(e) => {}
-    // }
+    match env::var("EDGE_BITS") {
+        Ok(edge_bits) => {
+            config.grin_pool.edge_bits = edge_bits.parse::<u32>().unwrap();
+        }
+        Err(e) => {}
+    }
 
     match env::var("POOL") {
         Ok(pool) => {
             config.grin_pool.pool = pool.trim().to_string();
-            println!("env pool: {:?}", config.grin_pool);
         }
         Err(e) => {}
     }
 
-    return config.clone();
+    println!("config: {:?}", config.clone());
+    return config;
 }

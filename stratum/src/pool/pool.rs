@@ -339,13 +339,23 @@ impl Pool {
 
                         // Check that its a valid pow size
                         // edge_bits: 29/31/32 is allowed
-                        if share.edge_bits < 29 || share.edge_bits == 30 {
+                        // if share.edge_bits != 29
+                        //     && share.edge_bits != 31
+                        //     && share.edge_bits != 32 {
+                        //     // Invalid Size
+                        //     worker.status.rejected += 1;
+                        //     worker.send_err("submit".to_string(), "Invalid POW size".to_string(), -32502);
+                        //     continue; // Dont process this share anymore
+                        // }
+
+
+                        if share.edge_bits != self.config.grin_pool.edge_bits {
                             // Invalid Size
                             worker.status.rejected += 1;
-                            // worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.send_err("submit".to_string(), "Invalid POW size".to_string(), -32502);
                             continue; // Dont process this share anymore
                         }
+
                         // Check solution length (proofsize check in pow verify (#2805))
                         // pow vec size must be 42
                         if share.pow.len() != PROOF_SIZE {

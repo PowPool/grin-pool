@@ -50,12 +50,16 @@ use pool::logger::init_logger;
 fn main() {
 
     init_logger();
-
     warn!("Starting Grin-Pool");
 
     let config = config::read_config();
-
     println!("{:?}", config);
+
+    if config.grin_pool.edge_bits != 29
+        && config.grin_pool.edge_bits != 31
+        && config.grin_pool.edge_bits != 32 {
+        panic!("Invalid grin_pool.edge_bits configure:{}", config.grin_pool.edge_bits);
+    }
 
     // default pool id "Grin Pool"
     // default server id "GrinPool"

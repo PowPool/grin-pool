@@ -93,6 +93,7 @@ pub struct Worker {
     pub authenticated: bool, // Has the miner already successfully logged in?
     pub status: WorkerStatus,        // Runing totals - reported with stratum status message
     pub worker_shares: WorkerShares, // Share Counts for current block
+    pub worker_shares_1m: WorkerShares, // Share Counts in 1 minute
     shares: Vec<SubmitParams>, // shares submitted by the miner that need to be processed by the pool
     request_ids: Queue<String>,     // Queue of request message ID's
     pub needs_job: bool, // Does this miner need a job for any reason
@@ -121,6 +122,7 @@ impl Worker {
             authenticated: false,
             status: WorkerStatus::new(uuid.clone()),
             worker_shares: WorkerShares::new(uuid.clone()),
+            worker_shares_1m: WorkerShares::new(uuid.clone()),
             shares: Vec::new(),
             request_ids: queue![],
             needs_job: false,
@@ -336,136 +338,6 @@ impl Worker {
         }
         return Ok(None);
     }
-
-    /// Worker Login
-    // pub fn do_login(&mut self, login_params: LoginParams) -> Result<(), String> {
-    //     // Save the entire login + password
-    //     self.login = Some(login_params.clone());
-    //
-    //     // Connect to REDIS
-    //     let redis_url = format!("redis://{}:{}/", self.config.redis.address, self.config.redis.port);
-    //     trace!("Connecting to REDIS at: {}", redis_url);
-    //     match self.redis {
-    //         None => {
-    //             match redis::Client::open(redis_url.clone().as_str()) {
-    //                 Err(e) => {
-    //                     error!("Failed to get REDIS client: {:?}", e);
-    //                 },
-    //                 Ok(client) => {
-    //                     // create connection from client and assign to self.redis
-    //                     match client.get_connection() {
-    //                         Err(e) => {
-    //                             error!("Failed to get REDIS connection: {:?}", e);
-    //                         },
-    //                         Ok(con) => {
-    //                             self.redis = Some(con);
-    //                         },
-    //                     }
-    //                 },
-    //             };
-    //         },
-    //         Some(_) => {
-    //             warn!("Already connected to REDIS");
-    //         },
-    //     };
-    //
-    //     // query from redis by "userid:<username>"
-    //
-    //     // TEMPORARY - Lookup from REDIS *as provided*
-    //     let mut username = login_params.login.clone().to_lowercase();
-    //     debug!("TEMPORARY: Looking up username: {}", username.clone());
-    //     let mut temp_userid_key = format!("userid.{}", username.clone());
-    //     let mut temp_id = 0;
-    //     match self.redis {
-    //         Some(ref mut redis) => {
-    //             let response: usize = match redis.get(temp_userid_key.clone()) {
-    //                 Ok(id) => id,
-    //                 Err(e) => 0,
-    //             };
-    //             if response != 0 {
-    //                 temp_id = response as usize;
-    //                 debug!("TEMPORARY: Got user LEGACY login from redis: {}", temp_id.clone());
-    //             };
-    //         },
-    //         None => {
-    //             warn!("TEMPORARY: Failed to find username {} in REDIS", username.clone());
-    //         }
-    //     }
-    //     // END TEMPORARY
-    //
-    //     // Separate the username.WorkerID if provided
-    //     let mut username_split: Vec<&str> = login_params.login.split('.').collect();
-    //     // if username_split.len() > 3 {
-    //     if username_split.len() > 2 {
-    //         // TEMPORARY
-    //         if temp_id != 0 {
-    //             self.user_id = temp_id;
-    //             trace!("User LEGACY login found in cache: {}", self.user_id.clone());
-    //             // We accepted the login
-    //             return Ok(());
-    //         }
-    //         // END TEMPORARY
-    //         self.error = true;
-    //         debug!("Worker {} failed to log in - Invalid username format: {}", self.user_id, login_params.login.clone());
-    //         return Err("Invalid Username Format".to_string());
-    //     }
-    //     username = username_split[0].to_string().to_lowercase();
-    //     // if username_split.len() >= 2 {
-    //     //     self.worker_shares.rigid = username_split[1].to_string();
-    //     // }
-    //     // if username_split.len() >= 3 {
-    //     //     self.worker_shares.workerid = username_split[2].to_string();
-    //     // }
-    //     // debug!("DEBUG: have username={}, rigid={}, workerid={}", username.clone(), self.worker_shares.rigid.clone(), self.worker_shares.workerid.clone());
-    //
-    //     if username_split.len() >= 2 {
-    //         self.worker_shares.workerid = username_split[1].to_string();
-    //     }
-    //     debug!("DEBUG: have username={}, workerid={}", username.clone(), self.worker_shares.workerid.clone());
-    //
-    //     // Set the agent string in WorkerShares
-    //     self.worker_shares.agent = login_params.agent.clone();
-    //
-    //     // Try to get this users pool id from the redis cache
-    //     debug!("Looking up username: {}", username.clone());
-    //     let mut userid_key = format!("userid.{}", username);
-    //     match self.redis {
-    //         Some(ref mut redis) => {
-    //             let response: usize = match redis.get(userid_key.clone()) {
-    //                 Ok(id) => id,
-    //                 Err(e) => 0,
-    //             };
-    //             if response != 0 {
-    //                 self.user_id = response as usize;
-    //                 debug!("Got user login from redis: {}", self.user_id.clone());
-    //             };
-    //         },
-    //         None => {}
-    //     }
-    //     if self.user_id != 0 {
-    //         trace!("User login found in cache: {}", self.user_id.clone());
-    //         // We accepted the login
-    //         return Ok(());
-    //     }
-    //
-    //     // TEMPORARY
-    //     // Didnt find new-format userid in redis, accept LEGACY format if that was found
-    //     if temp_id != 0 {
-    //         self.user_id = temp_id;
-    //         trace!("User LEGACY login found in cache: {}", self.user_id.clone());
-    //         // We accepted the login
-    //         return Ok(());
-    //     }
-    //     // END TEMPORARY
-    //
-    //     // XXX TODO: DATABASE LOOKUP THROUGH THE API IS TOO SLOW - DONT DO IT
-    //     // error!("Failed to find username {}", login_params.login.clone());
-    //     // self.error = true;
-    //     // return Err("Login Failed to get your ID, please visit https://GrinPool.com and create an account".to_string());
-    //
-    //     // always allow
-    //     return Ok(());
-    // }
 
     pub fn do_login(&mut self, login_params: LoginParams) -> Result<(), String> {
         // Save the entire login + password

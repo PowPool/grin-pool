@@ -10,6 +10,7 @@
 #
 # Configuration for the Stratum Pool
 [grin_pool]
+edge_bits = 29
 log_dir = "/stratum"
 pool = "grinpool"
 #log_level_file = "Warning"
@@ -18,10 +19,6 @@ pool = "grinpool"
 [workers]
 listen_address = "0.0.0.0"
 port_difficulty = [3333, 1]
-
-#[redis]
-#address = "redis-master"
-#port = 6379
 
 #
 # Configuration for access to upstream grin node
