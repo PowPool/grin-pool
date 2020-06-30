@@ -25,7 +25,7 @@ pub struct Config {
     pub grin_pool: PoolConfig,
     pub grin_node: NodeConfig,
     pub workers: WorkerConfig,
-    pub redis: RedisConfig,
+    // pub redis: RedisConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -54,11 +54,11 @@ pub struct NodeConfig {
     pub password: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct RedisConfig {
-    pub address: String,
-    pub port: u64,
-}
+// #[derive(Debug, Deserialize, Clone)]
+// pub struct RedisConfig {
+//     pub address: String,
+//     pub port: u64,
+// }
 
 
 pub fn read_config() -> Config {
@@ -87,13 +87,13 @@ pub fn read_config() -> Config {
         Err(e) => {}
     }
 
-    match env::var("REDIS_PORT") {
-        Ok(port) => {
-            config.redis.port = port.parse::<u64>().unwrap();
-            println!("env redis: {:?}", config.redis);
-        }
-        Err(e) => {}
-    }
+    // match env::var("REDIS_PORT") {
+    //     Ok(port) => {
+    //         config.redis.port = port.parse::<u64>().unwrap();
+    //         println!("env redis: {:?}", config.redis);
+    //     }
+    //     Err(e) => {}
+    // }
 
     match env::var("POOL") {
         Ok(pool) => {

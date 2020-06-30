@@ -24,7 +24,7 @@ extern crate time;
 extern crate log4rs;
 extern crate toml;
 extern crate reqwest;
-extern crate redis;
+// extern crate redis;
 extern crate blake2_rfc as blake2;
 extern crate byteorder;
 extern crate rand;

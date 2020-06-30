@@ -63,7 +63,7 @@ fn accept_workers(
                         }
                         warn!(
                             "Worker Listener - New connection from ip: {}",
-                            worker_addr
+                            worker_addr.clone()
                         );
                         // if connect peer not in ban list, add to workers list
                         stream
@@ -71,7 +71,9 @@ fn accept_workers(
                             .expect("set_nonblocking call failed");
                         let mut worker = Worker::new(config.clone(), BufStream::new(stream));
                         worker.set_difficulty(difficulty);
+                        debug!("add worker [{}:{}] into workers list", worker.uuid(), worker_addr.clone());
                         workers.lock().unwrap().insert(worker.uuid(), worker);
+                        debug!("workers list size: {}", workers.lock().unwrap().len());
                         // The new worker is now added to the workers list
                     }
                     Err(e) => {
@@ -480,7 +482,8 @@ impl Pool {
                 worker.set_difficulty(self.config.workers.port_difficulty.difficulty);
                 worker.set_height(self.job.height);
                 // Print this workers block_status for logstash to send to rmq
-                error!("{:?}", worker.worker_shares);
+                debug!("{:?}", worker.status);
+                debug!("{:?}", worker.worker_shares);
                 worker.send_job(&mut self.job.clone());
 
                 // TODO: need to add shares persistence
