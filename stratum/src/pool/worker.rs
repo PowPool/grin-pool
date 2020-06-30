@@ -59,7 +59,7 @@ impl Shares {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WorkerShares {
     pub id: String,  // Full id (UUID)
-    pub rigid: String,  // User assigned or "default"
+    //pub rigid: String,  // User assigned or "default"
     pub workerid: String, // User assigned or "0"
     pub agent: String,  // Miner identifier
     pub height: u64,
@@ -71,7 +71,7 @@ impl WorkerShares {
     pub fn new(id: String) -> WorkerShares {
         WorkerShares {
             id: id,
-            rigid: "default".to_string(),
+            //rigid: "default".to_string(),
             workerid: "0".to_string(),
             agent: "unknown".to_string(),
             height: 0,
@@ -395,7 +395,7 @@ impl Worker {
         }
         // END TEMPORARY
 
-        // Separate the username/RigID/WorkerID if provided
+        // Separate the username.WorkerID if provided
         let mut username_split: Vec<&str> = login_params.login.split('.').collect();
         if username_split.len() > 3 {
             // TEMPORARY
@@ -411,13 +411,18 @@ impl Worker {
             return Err("Invalid Username Format".to_string());
         }
         username = username_split[0].to_string().to_lowercase();
+        // if username_split.len() >= 2 {
+        //     self.worker_shares.rigid = username_split[1].to_string();
+        // }
+        // if username_split.len() >= 3 {
+        //     self.worker_shares.workerid = username_split[2].to_string();
+        // }
+        // debug!("DEBUG: have username={}, rigid={}, workerid={}", username.clone(), self.worker_shares.rigid.clone(), self.worker_shares.workerid.clone());
+
         if username_split.len() >= 2 {
-            self.worker_shares.rigid = username_split[1].to_string();
-        } 
-        if username_split.len() >= 3 {
-            self.worker_shares.workerid = username_split[2].to_string();
+            self.worker_shares.workerid = username_split[1].to_string();
         }
-        debug!("DEBUG: have username={}, rigid={}, workerid={}", username.clone(), self.worker_shares.rigid.clone(), self.worker_shares.workerid.clone());
+        debug!("DEBUG: have username={}, workerid={}", username.clone(), self.worker_shares.workerid.clone());
 
         // Set the agent string in WorkerShares
         self.worker_shares.agent = login_params.agent.clone();
@@ -453,11 +458,14 @@ impl Worker {
             return Ok(());
         }
         // END TEMPORARY
-        
+
         // XXX TODO: DATABASE LOOKUP THROUGH THE API IS TOO SLOW - DONT DO IT
-        error!("Failed to find username {}", login_params.login.clone());
-        self.error = true;
-        return Err("Login Failed to get your ID, please visit https://GrinPool.com and create an account".to_string());
+        // error!("Failed to find username {}", login_params.login.clone());
+        // self.error = true;
+        // return Err("Login Failed to get your ID, please visit https://GrinPool.com and create an account".to_string());
+
+        // always allow
+        return Ok(());
     }
 
 

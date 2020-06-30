@@ -309,7 +309,6 @@ impl Pool {
         }
     }
 
-
     //
     // Process shares returned by each workers
     fn process_shares(&mut self) {
