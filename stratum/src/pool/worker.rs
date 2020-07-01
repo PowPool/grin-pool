@@ -224,6 +224,7 @@ impl Worker {
     pub fn reset_worker_shares(&mut self, height: u64) {
         self.worker_shares.id = self.uuid();
         self.worker_shares.height = height;
+        self.worker_shares.totalwork = 0;
         self.worker_shares.shares = Shares::new(self.config.grin_pool.edge_bits);
     }
     
@@ -239,6 +240,7 @@ impl Worker {
     pub fn reset_worker_shares_1m(&mut self, timestamp: u64) {
         self.worker_shares_1m.id = self.uuid();
         self.worker_shares_1m.timestamp = timestamp;
+        self.worker_shares_1m.totalwork = 0;
         self.worker_shares_1m.shares = Shares::new(self.config.grin_pool.edge_bits);
     }
 
