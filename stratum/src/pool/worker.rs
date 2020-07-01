@@ -22,7 +22,6 @@ use serde_json::Value;
 use std::net::TcpStream;
 use reqwest;
 use std::collections::HashMap;
-// use redis::{Client, Commands, Connection, RedisResult};
 use std::iter;
 use std::{thread, time};
 use rand::{Rng, thread_rng};
@@ -59,9 +58,6 @@ impl Shares {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WorkerSharesExt {
     pub id: String,  // Full id (UUID)
-    pub username: String,  // User assigned or "username-xxx"
-    pub minername: String, // User assigned or "minername-xxx"
-    pub agent: String,  // Miner identifier
     pub height: u64,
     pub totalwork: u64,
     pub shares: Shares,
@@ -71,9 +67,6 @@ impl WorkerSharesExt {
     pub fn new(id: String, edge_bits: u32) -> WorkerSharesExt {
         WorkerSharesExt {
             id: id,
-            username: "username-xxx".to_string(),
-            minername: "minername-xxx".to_string(),
-            agent: "unknown".to_string(),
             height: 0,
             totalwork: 0,
             shares: Shares::new(edge_bits),
@@ -91,6 +84,9 @@ pub struct Worker {
     protocol: StratumProtocol,  // Structures, codes, methods for stratum protocol
     error: bool, // Is this worker connection in error state?
     pub authenticated: bool, // Has the miner already successfully logged in?
+    pub username: String,  // User assigned or "username-xxx"
+    pub minername: String, // User assigned or "minername-xxx"
+    pub agent: String,  // Miner identifier
     pub status: WorkerStatusExt,        // Runing totals - reported with stratum status message
     pub worker_shares: WorkerSharesExt, // Share Counts for current block
     pub worker_shares_1m: WorkerSharesExt, // Share Counts in 1 minute
@@ -119,6 +115,9 @@ impl Worker {
             protocol: StratumProtocol::new(),
             error: false,
             authenticated: false,
+            username: "username-default".to_string(),
+            minername: "minername-default".to_string(),
+            agent: "agent-default".to_string(),
             status: WorkerStatusExt::new(uuid.clone()),
             worker_shares: WorkerSharesExt::new(uuid.clone(), config.grin_pool.edge_bits),
             worker_shares_1m: WorkerSharesExt::new(uuid.clone(), config.grin_pool.edge_bits),
@@ -346,14 +345,14 @@ impl Worker {
 
         let mut username_split: Vec<&str> = login_params.login.split('.').collect();
         if username_split.len() >= 2 {
-            self.worker_shares.username = username_split[0].to_string();
-            self.worker_shares.minername = username_split[1].to_string();
+            self.username = username_split[0].to_string();
+            self.minername = username_split[1].to_string();
         } else {
-            self.worker_shares.username = login_params.login.clone();
+            self.username = login_params.login.clone();
         }
-        debug!("DEBUG: have username={}, minername={}", self.worker_shares.username.clone(), self.worker_shares.minername.clone());
+        debug!("DEBUG: have username={}, minername={}", self.username.clone(), self.minername.clone());
 
-        self.worker_shares.agent = login_params.agent.clone();
+        self.agent = login_params.agent.clone();
         return Ok(());
     }
 
@@ -431,6 +430,8 @@ impl Worker {
 					                    self.authenticated = true;
                                         self.needs_job = false; // not until requested
                                         self.status = WorkerStatusExt::new(self.uuid());
+                                        self.set_difficulty(self.config.workers.port_difficulty.difficulty);
+                                        self.set_next_difficulty(self.config.workers.port_difficulty.difficulty);
                                         self.send_ok(req.method);
                                     },
                                     Err(e) => {

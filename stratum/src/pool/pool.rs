@@ -71,8 +71,6 @@ fn accept_workers(
                             .set_nonblocking(true)
                             .expect("set_nonblocking call failed");
                         let mut worker = Worker::new(config.clone(), BufStream::new(stream));
-                        worker.set_difficulty(difficulty);
-                        worker.set_next_difficulty(difficulty);
                         debug!("add worker [{}:{}] into workers list", worker.uuid(), worker_addr.clone());
                         workers.lock().unwrap().insert(worker.uuid(), worker);
                         debug!("workers list size: {}", workers.lock().unwrap().len());
@@ -511,7 +509,6 @@ impl Pool {
                 debug!("{:?}", worker.status);
                 debug!("{:?}", worker.worker_shares);
                 worker.send_job(&mut self.job.clone());
-
                 worker.reset_worker_shares(self.job.height);
             }
         }
@@ -554,25 +551,30 @@ impl Pool {
             let mut w_m = self.workers.lock().unwrap();
             for (_, worker) in w_m.iter_mut() {
                 // difficulty up
-                if worker.worker_shares_1m.shares.accepted >= self.config.workers.expect_shares_1m * 2 {
+                if worker.worker_shares_1m.shares.accepted > self.config.workers.expect_shares_1m * 2 {
                     let mut new_diff = worker.status.curdiff * 2;
                     if new_diff > self.job.difficulty {
                         new_diff = self.job.difficulty;
                     }
+                    debug!("worker:{}, {}, {}, difficulty up, from: {}, to: {}",
+                        worker.user_id, worker.username, worker.minername, worker.status.curdiff, new_diff);
                     worker.set_next_difficulty(new_diff);
                 }
                 // difficulty down
-                if worker.worker_shares_1m.shares.accepted <= self.config.workers.expect_shares_1m / 2 {
+                if worker.worker_shares_1m.shares.accepted < self.config.workers.expect_shares_1m / 2 {
                     let mut new_diff = worker.status.curdiff / 2;
                     if new_diff < self.difficulty {
                         new_diff = self.difficulty;
                     }
+                    debug!("worker:{}, {}, {}, difficulty down, from: {}, to: {}",
+                           worker.user_id, worker.username, worker.minername, worker.status.curdiff, new_diff);
                     worker.set_next_difficulty(new_diff);
                 }
             }
 
+
+
         }
 
     }
-
 }
