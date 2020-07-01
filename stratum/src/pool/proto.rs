@@ -88,7 +88,7 @@ impl JobTemplate {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct WorkerStatusExt {
+pub struct WorkerStatus {
     pub id: String,
     pub height: u64,
     pub curdiff: u64,
@@ -99,9 +99,9 @@ pub struct WorkerStatusExt {
     pub stale: u64,
 }
 
-impl WorkerStatusExt {
-    pub fn new(id: String) -> WorkerStatusExt {
-        WorkerStatusExt {
+impl WorkerStatus {
+    pub fn new(id: String) -> WorkerStatus {
+        WorkerStatus {
             id: id,
             height: 0,
             curdiff: 0,

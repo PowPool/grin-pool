@@ -30,7 +30,7 @@ use queues::*;
 
 use pool::config::{Config, NodeConfig, PoolConfig, WorkerConfig};
 use pool::proto::{RpcRequest, RpcError};
-use pool::proto::{JobTemplate, LoginParams, StratumProtocol, SubmitParams, WorkerStatusExt};
+use pool::proto::{JobTemplate, LoginParams, StratumProtocol, SubmitParams, WorkerStatus};
 
 // ----------------------------------------
 // Worker Object - a connected stratum client - a miner
@@ -56,16 +56,16 @@ impl Shares {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct WorkerSharesExt {
+pub struct WorkerSharesPerBlock {
     pub id: String,  // Full id (UUID)
     pub height: u64,
     pub totalwork: u64,
     pub shares: Shares,
 }
 
-impl WorkerSharesExt {
-    pub fn new(id: String, edge_bits: u32) -> WorkerSharesExt {
-        WorkerSharesExt {
+impl WorkerSharesPerBlock {
+    pub fn new(id: String, edge_bits: u32) -> WorkerSharesPerBlock {
+        WorkerSharesPerBlock {
             id: id,
             height: 0,
             totalwork: 0,
@@ -74,6 +74,55 @@ impl WorkerSharesExt {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct WorkerSharesPerMinute {
+    pub id: String,  // Full id (UUID)
+    pub timestamp: u64,
+    pub totalwork: u64,
+    pub shares: Shares,
+}
+
+impl WorkerSharesPerMinute {
+    pub fn new(id: String, edge_bits: u32) -> WorkerSharesPerMinute {
+        WorkerSharesPerMinute {
+            id: id,
+            timestamp: 0,
+            totalwork: 0,
+            shares: Shares::new(edge_bits),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct WorkerSharesStatPerMinute {
+    pub id: String,
+    pub timestamp: u64,
+    pub username: String,
+    pub minername: String,
+    pub agent: String,
+    pub edge_bits: u32,
+    pub accepted: u64,
+    pub rejected: u64,
+    pub stale: u64,
+    pub totalwork: u64,
+}
+
+impl WorkerSharesStatPerMinute {
+    pub fn new(id: String, edge_bits: u32) -> WorkerSharesStatPerMinute {
+        WorkerSharesStatPerMinute {
+            id: id,
+            timestamp: 0,
+            username: "".to_string(),
+            minername: "".to_string(),
+            agent: "".to_string(),
+            edge_bits: edge_bits,
+            accepted: 0,
+            rejected: 0,
+            stale: 0,
+            totalwork: 0,
+        }
+    }
+}
 
 pub struct Worker {
     pub user_id: usize,   // the pool user_id or 0 if we dont know yet
@@ -87,9 +136,9 @@ pub struct Worker {
     pub username: String,  // User assigned or "username-xxx"
     pub minername: String, // User assigned or "minername-xxx"
     pub agent: String,  // Miner identifier
-    pub status: WorkerStatusExt,        // Runing totals - reported with stratum status message
-    pub worker_shares: WorkerSharesExt, // Share Counts for current block
-    pub worker_shares_1m: WorkerSharesExt, // Share Counts in 1 minute
+    pub status: WorkerStatus,        // Runing totals - reported with stratum status message
+    pub worker_shares: WorkerSharesPerBlock, // Share Counts for current block
+    pub worker_shares_1m: WorkerSharesPerMinute, // Share Counts in 1 minute
     shares: Vec<SubmitParams>, // shares submitted by the miner that need to be processed by the pool
     request_ids: Queue<String>,     // Queue of request message ID's
     pub needs_job: bool, // Does this miner need a job for any reason
@@ -118,14 +167,13 @@ impl Worker {
             username: "username-default".to_string(),
             minername: "minername-default".to_string(),
             agent: "agent-default".to_string(),
-            status: WorkerStatusExt::new(uuid.clone()),
-            worker_shares: WorkerSharesExt::new(uuid.clone(), config.grin_pool.edge_bits),
-            worker_shares_1m: WorkerSharesExt::new(uuid.clone(), config.grin_pool.edge_bits),
+            status: WorkerStatus::new(uuid.clone()),
+            worker_shares: WorkerSharesPerBlock::new(uuid.clone(), config.grin_pool.edge_bits),
+            worker_shares_1m: WorkerSharesPerMinute::new(uuid.clone(), config.grin_pool.edge_bits),
             shares: Vec::new(),
             request_ids: queue![],
             needs_job: false,
             requested_job: false,
-            // redis: None,
             buffer: String::with_capacity(4096),
         }
     }
@@ -185,6 +233,13 @@ impl Worker {
         self.worker_shares.shares.rejected += rejected;
         self.worker_shares.shares.stale += stale;
         self.worker_shares.totalwork += accepted * self.status.curdiff;
+    }
+
+    /// Reset worker_shares_1m for a new block
+    pub fn reset_worker_shares_1m(&mut self, timestamp: u64) {
+        self.worker_shares_1m.id = self.uuid();
+        self.worker_shares_1m.timestamp = timestamp;
+        self.worker_shares_1m.shares = Shares::new(self.config.grin_pool.edge_bits);
     }
 
     /// Add a share to the worker_shares_1m
@@ -292,7 +347,7 @@ impl Worker {
     }
 
     /// Send worker mining status
-    pub fn send_status(&mut self, status: WorkerStatusExt) -> Result<(), String> {
+    pub fn send_status(&mut self, status: WorkerStatus) -> Result<(), String> {
         trace!("Worker {} - Sending worker status", self.uuid());
         let status_value = serde_json::to_value(status).unwrap();
         return self.send_response(
@@ -429,7 +484,7 @@ impl Worker {
                                         // We accepted the login, send ok result
 					                    self.authenticated = true;
                                         self.needs_job = false; // not until requested
-                                        self.status = WorkerStatusExt::new(self.uuid());
+                                        self.status = WorkerStatus::new(self.uuid());
                                         self.set_difficulty(self.config.workers.port_difficulty.difficulty);
                                         self.set_next_difficulty(self.config.workers.port_difficulty.difficulty);
                                         self.send_ok(req.method);

@@ -11,7 +11,9 @@
 # Configuration for the Stratum Pool
 [grin_pool]
 edge_bits = 29
-log_dir = "/stratum"
+log_dir = "./logs"
+data_dir = "./data"
+data_temp_dir = "./temp"
 pool = "grinpool"
 #log_level_file = "Warning"
 #log_level_stdout = "Trace"

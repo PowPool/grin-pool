@@ -18,7 +18,12 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 use std::time::SystemTime;
 use std::{thread, time};
+use std::fs;
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
 use rand::Rng;
+use serde_json;
 
 use failure::Error;
 use grin_util::from_hex;
@@ -28,10 +33,10 @@ use grin_core::global::{ChainTypes, set_mining_mode};
 use grin_core::ser::{deserialize, ser_vec};
 
 use pool::config::{Config, NodeConfig, PoolConfig, WorkerConfig};
-use pool::proto::{JobTemplate, RpcError, SubmitParams, WorkerStatusExt};
+use pool::proto::{JobTemplate, RpcError, SubmitParams, WorkerStatus};
 
 use pool::server::Server;
-use pool::worker::Worker;
+use pool::worker::{Worker, WorkerSharesStatPerMinute};
 use pool::consensus::Proof as MinerProof;
 use pool::consensus::PROOF_SIZE;
 
@@ -549,6 +554,7 @@ impl Pool {
             // TODO adjust share difficulty for each worker
             // TODO save and reset
             let mut w_m = self.workers.lock().unwrap();
+            let mut stat_map = HashMap::new();
             for (_, worker) in w_m.iter_mut() {
                 // difficulty up
                 if worker.worker_shares_1m.shares.accepted > self.config.workers.expect_shares_1m * 2 {
@@ -570,11 +576,64 @@ impl Pool {
                            worker.user_id, worker.username, worker.minername, worker.status.curdiff, new_diff);
                     worker.set_next_difficulty(new_diff);
                 }
+
+                let mut share_stat = WorkerSharesStatPerMinute::new(worker.uuid(), self.config.grin_pool.edge_bits);
+                share_stat.timestamp = worker.worker_shares_1m.timestamp;
+                share_stat.username = worker.username.clone();
+                share_stat.minername = worker.minername.clone();
+                share_stat.agent = worker.agent.clone();
+                share_stat.accepted = worker.worker_shares_1m.shares.accepted;
+                share_stat.rejected = worker.worker_shares_1m.shares.rejected;
+                share_stat.stale = worker.worker_shares_1m.shares.stale;
+                share_stat.totalwork = worker.worker_shares_1m.totalwork;
+                stat_map.insert(share_stat.id.clone(), share_stat.clone());
+
+                // reset shares_1m for each worker
+                let this_reset_timestamp = time_now / 60 * 60;
+                worker.reset_worker_shares_1m(this_reset_timestamp);
             }
 
+            // serialize json string
+            match serde_json::to_string(&stat_map) {
+                Ok(jsonstr) => {
+                    debug!("Serialize json string:{}", jsonstr.clone());
 
+                    let this_reset_timestamp = time_now / 60 * 60;
+                    let data_file_name = this_reset_timestamp.to_string();
+                    let data_temp_file_name = data_file_name.clone() + ".tmp";
+                    let data_file_path_name = self.config.grin_pool.data_dir.clone() + "/" + &data_file_name;
+                    let data_temp_file_path_name = self.config.grin_pool.data_temp_dir.clone() + "/" + &data_temp_file_name;
+
+                    match File::create(data_temp_file_path_name.clone()) {
+                        Ok(mut output) => {
+                            match output.write_all(jsonstr.as_bytes()) {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    error!("Failed to write to file: {}", e);
+                                    return;
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            error!("Failed to create file: {}", e);
+                            return;
+                        },
+                    }
+
+                    match fs::rename(data_temp_file_path_name.clone(), &data_file_path_name) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            error!("Failed to rename {} => {}: {}", data_temp_file_path_name.clone(), data_file_path_name, e);
+                            return;
+                        },
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to serialize json string, err_info:{}", e);
+                    return;
+                },
+            }
 
         }
-
     }
 }

@@ -33,6 +33,7 @@ extern crate grin_core;
 extern crate grin_util;
 extern crate failure;
 extern crate backtrace;
+extern crate rustc_serialize;
 
 use std::io::BufRead;
 use std::io::{ErrorKind, Write};

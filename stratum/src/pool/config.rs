@@ -37,6 +37,8 @@ pub struct PortDifficulty {
 pub struct PoolConfig {
     pub edge_bits: u32,
     pub log_dir: String,
+    pub data_dir: String,
+    pub data_temp_dir: String,
     pub pool: String,
 }
 
