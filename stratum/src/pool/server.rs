@@ -26,7 +26,7 @@ use std::collections::HashMap;
 
 
 use pool::config::{Config, NodeConfig, PoolConfig, WorkerConfig};
-use pool::proto::{JobTemplate, LoginParams, RpcError, StratumProtocol, SubmitParams, WorkerStatus};
+use pool::proto::{JobTemplate, LoginParams, RpcError, StratumProtocol, SubmitParams, WorkerStatusExt};
 use pool::proto::{RpcRequest, RpcResponse};
 use pool::worker::Worker;
 
@@ -40,7 +40,7 @@ pub struct Server {
     protocol: StratumProtocol,
     error: bool,
     pub job: JobTemplate,
-    status: WorkerStatus,
+    status: WorkerStatusExt,
     buffer: String,
 }
 
@@ -54,7 +54,7 @@ impl Server {
             protocol: StratumProtocol::new(),
             error: false,
             job: JobTemplate::new(),
-            status: WorkerStatus::new("GrinPool".to_string()),
+            status: WorkerStatusExt::new("GrinPool".to_string()),
             buffer: String::with_capacity(4096),
         }
     }

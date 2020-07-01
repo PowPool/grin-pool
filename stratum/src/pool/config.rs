@@ -25,7 +25,6 @@ pub struct Config {
     pub grin_pool: PoolConfig,
     pub grin_node: NodeConfig,
     pub workers: WorkerConfig,
-    // pub redis: RedisConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -45,6 +44,7 @@ pub struct PoolConfig {
 pub struct WorkerConfig {
     pub listen_address: String,
     pub port_difficulty: PortDifficulty,
+    pub expect_shares_1m: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -73,6 +73,13 @@ pub fn read_config() -> Config {
     match env::var("DIFFICULTY") {
         Ok(difficulty) => {
             config.workers.port_difficulty.difficulty = difficulty.parse().unwrap() ;
+        }
+        Err(e) => {}
+    }
+
+    match env::var("EXPECT_SHARES") {
+        Ok(expect_shares) => {
+            config.workers.expect_shares_1m = expect_shares.parse::<u64>().unwrap();
         }
         Err(e) => {}
     }

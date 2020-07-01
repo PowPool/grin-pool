@@ -28,7 +28,7 @@ use grin_core::global::{ChainTypes, set_mining_mode};
 use grin_core::ser::{deserialize, ser_vec};
 
 use pool::config::{Config, NodeConfig, PoolConfig, WorkerConfig};
-use pool::proto::{JobTemplate, RpcError, SubmitParams, WorkerStatus};
+use pool::proto::{JobTemplate, RpcError, SubmitParams, WorkerStatusExt};
 
 use pool::server::Server;
 use pool::worker::Worker;
@@ -72,6 +72,7 @@ fn accept_workers(
                             .expect("set_nonblocking call failed");
                         let mut worker = Worker::new(config.clone(), BufStream::new(stream));
                         worker.set_difficulty(difficulty);
+                        worker.set_next_difficulty(difficulty);
                         debug!("add worker [{}:{}] into workers list", worker.uuid(), worker_addr.clone());
                         workers.lock().unwrap().insert(worker.uuid(), worker);
                         debug!("workers list size: {}", workers.lock().unwrap().len());
@@ -265,7 +266,7 @@ impl Pool {
                 // User id changed - probably because they logged in
                 id_changed.push(worker_uuid.clone());
                 debug!("id changed:  uuid {} - {:?}", worker.uuid().clone(), res );
-                worker.reset_worker_shares(self.job.height, self.difficulty);
+                worker.reset_worker_shares(self.job.height);
             }
         }
         // Rehash the worker using updated id
@@ -287,12 +288,15 @@ impl Pool {
                 warn!("job to: {} - needs_job: {}, requested_job: {}, authenticated: {}", worker_uuid, worker.needs_job, worker.requested_job, worker.authenticated );
                 // Randomize the nonce
                 // XXX TODO (We do have the deserialized block header code so we can do this now)
-                worker.set_difficulty(self.difficulty);
+                // use new adjusted difficulty
+                if worker.status.curdiff != worker.status.nextdiff {
+                    worker.set_difficulty(worker.status.nextdiff);
+                }
                 worker.set_height(self.job.height);
                 // Print this workers worker_shares (previous block) for logstash to send to rmq
                 error!("{:?}", worker.worker_shares);
                 // Reset the workers current block stats
-                worker.reset_worker_shares(self.job.height, self.difficulty);
+                worker.reset_worker_shares(self.job.height);
                 worker.send_job(&mut self.job.clone());
             }
         }
@@ -349,17 +353,6 @@ impl Pool {
                         } else {
                             self.duplicates.insert(share.pow.clone(), worker.user_id());
                         }
-
-                        // Check that its a valid pow size
-                        // edge_bits: 29/31/32 is allowed
-                        // if share.edge_bits != 29
-                        //     && share.edge_bits != 31
-                        //     && share.edge_bits != 32 {
-                        //     // Invalid Size
-                        //     worker.status.rejected += 1;
-                        //     worker.send_err("submit".to_string(), "Invalid POW size".to_string(), -32502);
-                        //     continue; // Dont process this share anymore
-                        // }
 
                         if share.edge_bits != self.config.grin_pool.edge_bits {
                             // Invalid Size
@@ -453,15 +446,16 @@ impl Pool {
                             worker.send_err("submit".to_string(), "Rejected low difficulty solution".to_string(), -32502);
                             continue; // Dont process this share anymore
                         }
-                        if difficulty < worker.status.difficulty {
+                        if difficulty < worker.status.curdiff {
                             worker.status.rejected += 1;
                             worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502);
                             continue; // Dont process this share anymore
                         }
-                        if difficulty >= worker.status.difficulty {
+                        if difficulty >= worker.status.curdiff {
                             worker.status.accepted += 1;
+                            worker.status.totalwork += worker.status.curdiff;
                             worker.add_shares(share.edge_bits, 1, 0, 0); // Accepted, Rejected, Stale
                             worker.add_shares_1m(share.edge_bits, 1, 0, 0); // Accepted, Rejected, Stale
                             worker.send_ok("submit".to_string());
@@ -479,7 +473,7 @@ impl Pool {
                                 self.id,
                                 share.height,
                                 share.nonce,
-                                worker.status.difficulty,
+                                worker.status.curdiff,
                                 worker.uuid(),
                             );
                         }
@@ -487,7 +481,7 @@ impl Pool {
                                 self.id,
                                 share.height,
                                 share.nonce,
-                                worker.status.difficulty,
+                                worker.status.curdiff,
                                 worker.uuid(),
                         );
                     }
@@ -508,14 +502,17 @@ impl Pool {
         // XXX TODO: need to set a unique timestamp and record it in the worker struct
         for (worker_uuid, worker) in w_m.iter_mut() {
             if worker.authenticated {
-                worker.set_difficulty(self.config.workers.port_difficulty.difficulty);
+                // change to use adjusted difficulty
+                if worker.status.curdiff != worker.status.nextdiff {
+                    worker.set_difficulty(worker.status.nextdiff);
+                }
                 worker.set_height(self.job.height);
                 // Print this workers block_status for logstash to send to rmq
                 debug!("{:?}", worker.status);
                 debug!("{:?}", worker.worker_shares);
                 worker.send_job(&mut self.job.clone());
 
-                worker.reset_worker_shares(self.job.height, self.difficulty);
+                worker.reset_worker_shares(self.job.height);
             }
         }
         return Ok(());
@@ -551,7 +548,31 @@ impl Pool {
         if time_now >= self.next_reset_timestamp {
             self.next_reset_timestamp = ((time_now / 60) + 1) * 60;
             debug!("now: {}, next: {}", time_now, self.next_reset_timestamp);
+
+            // TODO adjust share difficulty for each worker
+            // TODO save and reset
+            let mut w_m = self.workers.lock().unwrap();
+            for (_, worker) in w_m.iter_mut() {
+                // difficulty up
+                if worker.worker_shares_1m.shares.accepted >= self.config.workers.expect_shares_1m * 2 {
+                    let mut new_diff = worker.status.curdiff * 2;
+                    if new_diff > self.job.difficulty {
+                        new_diff = self.job.difficulty;
+                    }
+                    worker.set_next_difficulty(new_diff);
+                }
+                // difficulty down
+                if worker.worker_shares_1m.shares.accepted <= self.config.workers.expect_shares_1m / 2 {
+                    let mut new_diff = worker.status.curdiff / 2;
+                    if new_diff < self.difficulty {
+                        new_diff = self.difficulty;
+                    }
+                    worker.set_next_difficulty(new_diff);
+                }
+            }
+
         }
+
     }
 
 }

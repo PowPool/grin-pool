@@ -31,7 +31,7 @@ use queues::*;
 
 use pool::config::{Config, NodeConfig, PoolConfig, WorkerConfig};
 use pool::proto::{RpcRequest, RpcError};
-use pool::proto::{JobTemplate, LoginParams, StratumProtocol, SubmitParams, WorkerStatus};
+use pool::proto::{JobTemplate, LoginParams, StratumProtocol, SubmitParams, WorkerStatusExt};
 
 // ----------------------------------------
 // Worker Object - a connected stratum client - a miner
@@ -57,26 +57,26 @@ impl Shares {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct WorkerShares {
+pub struct WorkerSharesExt {
     pub id: String,  // Full id (UUID)
     pub username: String,  // User assigned or "username-xxx"
     pub minername: String, // User assigned or "minername-xxx"
     pub agent: String,  // Miner identifier
     pub height: u64,
-    pub difficulty: u64,
-    pub shares: HashMap<u32, Shares>,
+    pub totalwork: u64,
+    pub shares: Shares,
 }
 
-impl WorkerShares {
-    pub fn new(id: String) -> WorkerShares {
-        WorkerShares {
+impl WorkerSharesExt {
+    pub fn new(id: String, edge_bits: u32) -> WorkerSharesExt {
+        WorkerSharesExt {
             id: id,
             username: "username-xxx".to_string(),
             minername: "minername-xxx".to_string(),
             agent: "unknown".to_string(),
             height: 0,
-            difficulty: 0,
-            shares: HashMap::new(),
+            totalwork: 0,
+            shares: Shares::new(edge_bits),
         }
     }
 }
@@ -91,14 +91,13 @@ pub struct Worker {
     protocol: StratumProtocol,  // Structures, codes, methods for stratum protocol
     error: bool, // Is this worker connection in error state?
     pub authenticated: bool, // Has the miner already successfully logged in?
-    pub status: WorkerStatus,        // Runing totals - reported with stratum status message
-    pub worker_shares: WorkerShares, // Share Counts for current block
-    pub worker_shares_1m: WorkerShares, // Share Counts in 1 minute
+    pub status: WorkerStatusExt,        // Runing totals - reported with stratum status message
+    pub worker_shares: WorkerSharesExt, // Share Counts for current block
+    pub worker_shares_1m: WorkerSharesExt, // Share Counts in 1 minute
     shares: Vec<SubmitParams>, // shares submitted by the miner that need to be processed by the pool
     request_ids: Queue<String>,     // Queue of request message ID's
     pub needs_job: bool, // Does this miner need a job for any reason
     pub requested_job: bool, // The miner sent a job request
-    // redis: Option<redis::Connection>, // Login/UserID are cached here
     pub buffer: String, // Read-Buffer for stream
 }
 
@@ -120,9 +119,9 @@ impl Worker {
             protocol: StratumProtocol::new(),
             error: false,
             authenticated: false,
-            status: WorkerStatus::new(uuid.clone()),
-            worker_shares: WorkerShares::new(uuid.clone()),
-            worker_shares_1m: WorkerShares::new(uuid.clone()),
+            status: WorkerStatusExt::new(uuid.clone()),
+            worker_shares: WorkerSharesExt::new(uuid.clone(), config.grin_pool.edge_bits),
+            worker_shares_1m: WorkerSharesExt::new(uuid.clone(), config.grin_pool.edge_bits),
             shares: Vec::new(),
             request_ids: queue![],
             needs_job: false,
@@ -161,7 +160,12 @@ impl Worker {
 
     /// Set job difficulty
     pub fn set_difficulty(&mut self, new_difficulty: u64) {
-        self.status.difficulty = new_difficulty;
+        self.status.curdiff = new_difficulty;
+    }
+
+    /// Set next job difficulty
+    pub fn set_next_difficulty(&mut self, new_difficulty: u64) {
+        self.status.nextdiff = new_difficulty;
     }
 
     /// Set job height
@@ -170,55 +174,26 @@ impl Worker {
     }
 
     /// Reset worker_shares for a new block
-    pub fn reset_worker_shares(&mut self, height: u64, difficulty: u64) {
+    pub fn reset_worker_shares(&mut self, height: u64) {
         self.worker_shares.id = self.uuid();
         self.worker_shares.height = height;
-        self.worker_shares.difficulty = difficulty;
-        self.worker_shares.shares = HashMap::new();
+        self.worker_shares.shares = Shares::new(self.config.grin_pool.edge_bits);
     }
     
     /// Add a share to the worker_shares
     pub fn add_shares(&mut self, size: u32, accepted: u64, rejected: u64, stale: u64) {
-        if self.worker_shares.shares.contains_key(&size) {
-            match self.worker_shares.shares.get_mut(&size) {
-                Some(mut shares) => {
-                    shares.accepted += accepted;
-                    shares.rejected += rejected;
-                    shares.stale += stale;
-                },
-                None => {
-                    // This cant happen
-                }
-            }
-        } else {
-            let mut shares: Shares = Shares::new(size);
-            shares.accepted = accepted;
-            shares.rejected = rejected;
-            shares.stale = stale;
-            self.worker_shares.shares.insert(size, shares);
-        }
+        self.worker_shares.shares.accepted += accepted;
+        self.worker_shares.shares.rejected += rejected;
+        self.worker_shares.shares.stale += stale;
+        self.worker_shares.totalwork += accepted * self.status.curdiff;
     }
 
     /// Add a share to the worker_shares_1m
     pub fn add_shares_1m(&mut self, size: u32, accepted: u64, rejected: u64, stale: u64) {
-        if self.worker_shares_1m.shares.contains_key(&size) {
-            match self.worker_shares_1m.shares.get_mut(&size) {
-                Some(mut shares) => {
-                    shares.accepted += accepted;
-                    shares.rejected += rejected;
-                    shares.stale += stale;
-                },
-                None => {
-                    // This cant happen
-                }
-            }
-        } else {
-            let mut shares: Shares = Shares::new(size);
-            shares.accepted = accepted;
-            shares.rejected = rejected;
-            shares.stale = stale;
-            self.worker_shares_1m.shares.insert(size, shares);
-        }
+        self.worker_shares_1m.shares.accepted += accepted;
+        self.worker_shares_1m.shares.rejected += rejected;
+        self.worker_shares_1m.shares.stale += stale;
+        self.worker_shares_1m.totalwork += accepted * self.status.curdiff;
     }
 
     /// Send a response
@@ -282,7 +257,11 @@ impl Worker {
     pub fn send_job(&mut self, job: &mut JobTemplate) -> Result<(), String> {
         trace!("Worker {} - Sending a job downstream: requested = {}", self.uuid(), self.requested_job);
         // Set the difficulty
-        job.difficulty = self.status.difficulty;
+        // use new adjusted difficulty
+        if self.status.curdiff != self.status.nextdiff {
+            self.set_difficulty(self.status.nextdiff);
+        }
+        job.difficulty = self.status.curdiff;
         let requested = self.requested_job;
         self.needs_job = false;
         self.requested_job = false;
@@ -314,7 +293,7 @@ impl Worker {
     }
 
     /// Send worker mining status
-    pub fn send_status(&mut self, status: WorkerStatus) -> Result<(), String> {
+    pub fn send_status(&mut self, status: WorkerStatusExt) -> Result<(), String> {
         trace!("Worker {} - Sending worker status", self.uuid());
         let status_value = serde_json::to_value(status).unwrap();
         return self.send_response(
@@ -451,7 +430,7 @@ impl Worker {
                                         // We accepted the login, send ok result
 					                    self.authenticated = true;
                                         self.needs_job = false; // not until requested
-                                        self.status = WorkerStatus::new(self.uuid());
+                                        self.status = WorkerStatusExt::new(self.uuid());
                                         self.send_ok(req.method);
                                     },
                                     Err(e) => {
