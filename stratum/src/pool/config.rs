@@ -25,6 +25,7 @@ pub struct Config {
     pub grin_pool: PoolConfig,
     pub grin_node: NodeConfig,
     pub workers: WorkerConfig,
+    pub api: ApiConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -58,11 +59,12 @@ pub struct NodeConfig {
     pub password: String,
 }
 
-// #[derive(Debug, Deserialize, Clone)]
-// pub struct RedisConfig {
-//     pub address: String,
-//     pub port: u64,
-// }
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiConfig {
+    pub listen_address: String,
+    pub api_port: u64,
+}
+
 
 pub fn read_config() -> Config {
     let mut config_file = File::open(CONFIG_FILE_NAME).expect("Config file not found");

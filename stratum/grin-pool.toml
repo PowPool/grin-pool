@@ -24,6 +24,10 @@ port_difficulty = [3333, 1]
 diff_adjust = true
 expect_shares_1m = 5
 
+[api]
+listen_address = "0.0.0.0"
+api_port = 8038
+
 #
 # Configuration for access to upstream grin node
 [grin_node]

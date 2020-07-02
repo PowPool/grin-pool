@@ -185,7 +185,7 @@ impl Pool {
         self.difficulty = self.config.workers.port_difficulty.difficulty;
 
         // Set the Chain Type
-        error!("set_mining_mode: {:?}", self.chain_type.clone());
+        debug!("set_mining_mode: {:?}", self.chain_type.clone());
         set_mining_mode(self.chain_type.clone());
 
         // ------------
@@ -297,7 +297,7 @@ impl Pool {
                 }
                 worker.set_height(self.job.height);
                 // Print this workers worker_shares (previous block) for logstash to send to rmq
-                error!("{:?}", worker.worker_shares);
+                // trace!("{:?}", worker.worker_shares);
                 // Reset the workers current block stats
                 worker.reset_worker_shares(self.job.height);
                 worker.send_job(&mut self.job.clone());
@@ -312,8 +312,7 @@ impl Pool {
             trace!("accept_new_job for height {}, job_id {}", self.server.job.height, self.server.job.job_id);
             let new_height: bool = self.job.height != self.server.job.height;
             let mut new_job = self.server.job.clone();
-            // Update the new jobs job_id (bminer wants this)
-            new_job.job_id = new_job.height * 1000 + new_job.job_id;
+
             self.job = new_job;
             // debug!("accept_new_job broadcasting: {}", self.job.pre_pow.clone());
             // broadcast it to the workers
@@ -469,8 +468,6 @@ impl Pool {
 
                         // meet difficulty requirement of job from upstream stratum server (mine pool or grin node)
                         if difficulty >= self.job.difficulty { // XXX TODO <---- this compares scaled to unscaled difficulty values - no good XXX TODO
-                            // remove the block height prefix from the job_id
-                            share.job_id = share.job_id % share.height;
                             self.server.submit_share(&share.clone(), worker.uuid());
                             warn!("{} - Submitted share at height {} with nonce {} with difficulty {} from worker {}",
                                 self.id,
