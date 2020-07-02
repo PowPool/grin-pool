@@ -128,7 +128,7 @@ pub struct Worker {
     pub user_id: usize,   // the pool user_id or 0 if we dont know yet
     pub connection_id: String,  // The random per-connection id used to match proxied stratum messages
     login: Option<LoginParams>,  // The stratum login parameters sent by the miner
-    stream: BufStream<TcpStream>,  // Connection with the mier process
+    stream: BufStream<TcpStream>,  // Connection with the miner process
     config: Config, // Values from the config.toml file
     protocol: StratumProtocol,  // Structures, codes, methods for stratum protocol
     error: bool, // Is this worker connection in error state?
@@ -446,7 +446,7 @@ impl Worker {
                             "login" => {
                                 debug!("Worker {} - Accepting Login request", self.uuid());
                                 // login before, do not need to do any thing
-                                if self.user_id != 0 {
+                                if self.authenticated {
                                     // dont log in again, just say ok
                                     debug!("User already logged in: {}", self.user_id.clone());
                                     self.send_ok(req.method);
@@ -484,6 +484,9 @@ impl Worker {
                                 match self.do_login(login_params) {
                                     Ok(_) => {
                                         // We accepted the login, send ok result
+                                        let peer_addr = self.stream.get_mut().peer_addr().unwrap().clone();
+                                        debug!("Worker {} login success from address {}", self.uuid(), peer_addr);
+
 					                    self.authenticated = true;
                                         self.needs_job = false; // not until requested
                                         self.status = WorkerStatus::new(self.uuid());

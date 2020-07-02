@@ -46,6 +46,7 @@ pub struct PoolConfig {
 pub struct WorkerConfig {
     pub listen_address: String,
     pub port_difficulty: PortDifficulty,
+    pub diff_adjust: bool,
     pub expect_shares_1m: u64,
 }
 

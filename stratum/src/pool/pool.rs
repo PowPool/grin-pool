@@ -556,25 +556,27 @@ impl Pool {
             let mut w_m = self.workers.lock().unwrap();
             let mut stat_map = HashMap::new();
             for (_, worker) in w_m.iter_mut() {
-                // difficulty up
-                if worker.worker_shares_1m.shares.accepted > self.config.workers.expect_shares_1m * 2 {
-                    let mut new_diff = worker.status.curdiff * 2;
-                    if new_diff > self.job.difficulty {
-                        new_diff = self.job.difficulty;
+                if self.config.workers.diff_adjust {
+                    // difficulty up
+                    if worker.worker_shares_1m.shares.accepted > self.config.workers.expect_shares_1m * 2 {
+                        let mut new_diff = worker.status.curdiff * 2;
+                        if new_diff > self.job.difficulty {
+                            new_diff = self.job.difficulty;
+                        }
+                        debug!("worker:{}, {}, {}, difficulty up, from: {}, to: {}",
+                               worker.user_id, worker.username, worker.minername, worker.status.curdiff, new_diff);
+                        worker.set_next_difficulty(new_diff);
                     }
-                    debug!("worker:{}, {}, {}, difficulty up, from: {}, to: {}",
-                        worker.user_id, worker.username, worker.minername, worker.status.curdiff, new_diff);
-                    worker.set_next_difficulty(new_diff);
-                }
-                // difficulty down
-                if worker.worker_shares_1m.shares.accepted < self.config.workers.expect_shares_1m / 2 {
-                    let mut new_diff = worker.status.curdiff / 2;
-                    if new_diff < self.difficulty {
-                        new_diff = self.difficulty;
+                    // difficulty down
+                    if worker.worker_shares_1m.shares.accepted < self.config.workers.expect_shares_1m / 2 {
+                        let mut new_diff = worker.status.curdiff / 2;
+                        if new_diff < self.difficulty {
+                            new_diff = self.difficulty;
+                        }
+                        debug!("worker:{}, {}, {}, difficulty down, from: {}, to: {}",
+                               worker.user_id, worker.username, worker.minername, worker.status.curdiff, new_diff);
+                        worker.set_next_difficulty(new_diff);
                     }
-                    debug!("worker:{}, {}, {}, difficulty down, from: {}, to: {}",
-                           worker.user_id, worker.username, worker.minername, worker.status.curdiff, new_diff);
-                    worker.set_next_difficulty(new_diff);
                 }
 
                 let mut share_stat = WorkerSharesStatPerMinute::new(worker.uuid(), self.config.grin_pool.edge_bits);
@@ -593,47 +595,48 @@ impl Pool {
                 worker.reset_worker_shares_1m(this_reset_timestamp);
             }
 
-            // serialize json string
-            match serde_json::to_string(&stat_map) {
-                Ok(jsonstr) => {
-                    debug!("Serialize json string:{}", jsonstr.clone());
+            if !stat_map.is_empty() {
+                // serialize json string
+                match serde_json::to_string(&stat_map) {
+                    Ok(jsonstr) => {
+                        debug!("Serialize json string:{}", jsonstr.clone());
 
-                    let this_reset_timestamp = time_now / 60 * 60;
-                    let data_file_name = this_reset_timestamp.to_string();
-                    let data_temp_file_name = data_file_name.clone() + ".tmp";
-                    let data_file_path_name = self.config.grin_pool.data_dir.clone() + "/" + &data_file_name;
-                    let data_temp_file_path_name = self.config.grin_pool.data_temp_dir.clone() + "/" + &data_temp_file_name;
+                        let this_reset_timestamp = time_now / 60 * 60;
+                        let data_file_name = this_reset_timestamp.to_string();
+                        let data_temp_file_name = data_file_name.clone() + ".tmp";
+                        let data_file_path_name = self.config.grin_pool.data_dir.clone() + "/" + &data_file_name;
+                        let data_temp_file_path_name = self.config.grin_pool.data_temp_dir.clone() + "/" + &data_temp_file_name;
 
-                    match File::create(data_temp_file_path_name.clone()) {
-                        Ok(mut output) => {
-                            match output.write_all(jsonstr.as_bytes()) {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    error!("Failed to write to file: {}", e);
-                                    return;
+                        match File::create(data_temp_file_path_name.clone()) {
+                            Ok(mut output) => {
+                                match output.write_all(jsonstr.as_bytes()) {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        error!("Failed to write to file: {}", e);
+                                        return;
+                                    }
                                 }
-                            }
-                        },
-                        Err(e) => {
-                            error!("Failed to create file: {}", e);
-                            return;
-                        },
-                    }
+                            },
+                            Err(e) => {
+                                error!("Failed to create file: {}", e);
+                                return;
+                            },
+                        }
 
-                    match fs::rename(data_temp_file_path_name.clone(), &data_file_path_name) {
-                        Ok(_) => (),
-                        Err(e) => {
-                            error!("Failed to rename {} => {}: {}", data_temp_file_path_name.clone(), data_file_path_name, e);
-                            return;
-                        },
+                        match fs::rename(data_temp_file_path_name.clone(), &data_file_path_name) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                error!("Failed to rename {} => {}: {}", data_temp_file_path_name.clone(), data_file_path_name, e);
+                                return;
+                            },
+                        }
                     }
+                    Err(e) => {
+                        error!("Failed to serialize json string, err_info:{}", e);
+                        return;
+                    },
                 }
-                Err(e) => {
-                    error!("Failed to serialize json string, err_info:{}", e);
-                    return;
-                },
             }
-
         }
     }
 }

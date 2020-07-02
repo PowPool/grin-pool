@@ -21,6 +21,7 @@ pool = "grinpool"
 [workers]
 listen_address = "0.0.0.0"
 port_difficulty = [3333, 1]
+diff_adjust = true
 expect_shares_1m = 5
 
 #
