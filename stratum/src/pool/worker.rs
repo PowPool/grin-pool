@@ -493,7 +493,7 @@ impl Worker {
                                         self.set_difficulty(self.config.workers.port_difficulty.difficulty);
                                         self.set_next_difficulty(self.config.workers.port_difficulty.difficulty);
                                         self.send_ok(req.method);
-                                    },
+                                    }
                                     Err(e) => {
                                         return self.send_err(
                                             "login".to_string(),
@@ -513,7 +513,7 @@ impl Worker {
                                 match serde_json::from_value(req.params.unwrap()) {
                                     Result::Ok(share) => {
                            			    self.shares.push(share);
-                                    },
+                                    }
                                     Result::Err(err) => { }
                                 };
                             }
@@ -535,7 +535,7 @@ impl Worker {
                                 self.error = true;
                                 return Err("Unknown request".to_string());
                             }
-                        };
+                        }
                     }
                     None => {} // Not an error, just no messages for us right now
                 }

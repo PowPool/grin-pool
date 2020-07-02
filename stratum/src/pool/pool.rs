@@ -616,11 +616,11 @@ impl Pool {
                                         return;
                                     }
                                 }
-                            },
+                            }
                             Err(e) => {
                                 error!("Failed to create file: {}", e);
                                 return;
-                            },
+                            }
                         }
 
                         match fs::rename(data_temp_file_path_name.clone(), &data_file_path_name) {
@@ -628,13 +628,13 @@ impl Pool {
                             Err(e) => {
                                 error!("Failed to rename {} => {}: {}", data_temp_file_path_name.clone(), data_file_path_name, e);
                                 return;
-                            },
+                            }
                         }
                     }
                     Err(e) => {
                         error!("Failed to serialize json string, err_info:{}", e);
                         return;
-                    },
+                    }
                 }
             }
         }
