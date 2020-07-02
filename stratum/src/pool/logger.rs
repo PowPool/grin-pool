@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
+// #[macro_use]
 use std::fs::OpenOptions;
 use std::{panic, thread};
 use backtrace::Backtrace;
@@ -37,7 +37,6 @@ use pool::config;
 //lazy_static! {
 
 pub fn init_logger() {
-
     let config = config::read_config();
     let log_file_path = config.grin_pool.log_dir + "/" + "grin-pool.log";
     let level_stdout = LevelFilter::Trace;
@@ -65,7 +64,7 @@ pub fn init_logger() {
 		// If maximum log size is specified, use rolling file appender
 		// or use basic one otherwise
 		let filter = Box::new(ThresholdFilter::new(level_file));
-		let file: Box<Append> = {
+		let file: Box<dyn Append> = {
 			let roller = FixedWindowRoller::builder()
 				.build(&format!("{}.{{}}.gz", log_file_path), 32)
 				.unwrap();

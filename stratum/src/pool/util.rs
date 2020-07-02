@@ -17,10 +17,10 @@
 use byteorder::{BigEndian, ByteOrder};
 use rand::{self, Rng};
 
-
 use std::fmt::Write;
 use std::num;
 
+#[allow(dead_code)]
 pub fn header_data(pre_nonce: &str, post_nonce: &str, nonce: u64) -> (Vec<u8>, u32) {
 	// Turn input strings into vectors
 	let mut pre_vec = from_hex_string(pre_nonce);
@@ -40,6 +40,7 @@ pub fn header_data(pre_nonce: &str, post_nonce: &str, nonce: u64) -> (Vec<u8>, u
 	(pre_vec, sec_scaling)
 }
 
+#[allow(dead_code)]
 pub fn get_next_header_data(pre_nonce: &str, post_nonce: &str) -> (u64, Vec<u8>, u32) {
 	let nonce: u64 = rand::OsRng::new().unwrap().gen();
 	let (hd, sec_scaling) = header_data(pre_nonce, post_nonce, nonce);
@@ -47,6 +48,7 @@ pub fn get_next_header_data(pre_nonce: &str, post_nonce: &str) -> (u64, Vec<u8>,
 }
 
 /// Helper to convert a hex string
+#[allow(dead_code)]
 pub fn from_hex_string(in_str: &str) -> Vec<u8> {
 	let mut bytes = Vec::new();
 	for i in 0..(in_str.len() / 2) {
@@ -61,6 +63,7 @@ pub fn from_hex_string(in_str: &str) -> Vec<u8> {
 
 // From grin-miner util
 /// Encode the provided bytes into a hex string
+#[allow(dead_code)]
 pub fn to_hex(bytes: Vec<u8>) -> String {
 	let mut s = String::new();
 	for byte in bytes {
@@ -70,6 +73,7 @@ pub fn to_hex(bytes: Vec<u8>) -> String {
 }
 
 /// Decode a hex string into bytes.
+#[allow(dead_code)]
 pub fn from_hex(hex_str: String) -> Result<Vec<u8>, num::ParseIntError> {
 	let hex_trim = if &hex_str[..2] == "0x" {
 		hex_str[2..].to_owned()
@@ -82,6 +86,7 @@ pub fn from_hex(hex_str: String) -> Result<Vec<u8>, num::ParseIntError> {
 		.collect::<Result<Vec<u8>, _>>()
 }
 
+#[allow(dead_code)]
 fn split_n(s: &str, n: usize) -> Vec<&str> {
 	(0..(s.len() - n + 1) / 2 + 1)
 		.map(|i| &s[2 * i..2 * i + n])

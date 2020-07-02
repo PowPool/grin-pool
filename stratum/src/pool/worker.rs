@@ -199,7 +199,7 @@ impl Worker {
         match self.login {
             None => "None".to_string(),
             Some(ref login) => {
-                let mut loginstr = login.login.clone();
+                let loginstr = login.login.clone();
                 return loginstr.to_string();
             }
         }
@@ -229,7 +229,7 @@ impl Worker {
     }
     
     /// Add a share to the worker_shares
-    pub fn add_shares(&mut self, size: u32, accepted: u64, rejected: u64, stale: u64) {
+    pub fn add_shares(&mut self, _: u32, accepted: u64, rejected: u64, stale: u64) {
         self.worker_shares.shares.accepted += accepted;
         self.worker_shares.shares.rejected += rejected;
         self.worker_shares.shares.stale += stale;
@@ -245,7 +245,7 @@ impl Worker {
     }
 
     /// Add a share to the worker_shares_1m
-    pub fn add_shares_1m(&mut self, size: u32, accepted: u64, rejected: u64, stale: u64) {
+    pub fn add_shares_1m(&mut self, _: u32, accepted: u64, rejected: u64, stale: u64) {
         self.worker_shares_1m.shares.accepted += accepted;
         self.worker_shares_1m.shares.rejected += rejected;
         self.worker_shares_1m.shares.stale += stale;
@@ -261,7 +261,7 @@ impl Worker {
         // XXX TODO: Better matching of method?
         let req_id = match self.request_ids.remove() {
             Ok(id) => id,
-            Err(e) => {
+            Err(_) => {
                 error!("EMPTY request_ids ERROR");
                 "0".to_string()
             },
@@ -289,7 +289,7 @@ impl Worker {
         // XXX TODO: Better matching of method?
         let req_id = match self.request_ids.remove() {
             Ok(id) => id,
-            Err(e) => {
+            Err(_) => {
                 error!("EMPTY request_ids ERROR");
                 "0".to_string()
             },
@@ -400,7 +400,7 @@ impl Worker {
         // Save the entire login + password
         self.login = Some(login_params.clone());
 
-        let mut username_split: Vec<&str> = login_params.login.split('.').collect();
+        let username_split: Vec<&str> = login_params.login.split('.').collect();
         if username_split.len() >= 2 {
             self.username = username_split[0].to_string();
             self.minername = username_split[1].to_string();
@@ -441,7 +441,7 @@ impl Worker {
                             req.method
                         );
                         // Add this request id to the queue
-                        self.request_ids.add(req.id.clone());
+                        self.request_ids.add(req.id.clone()).unwrap();
                         match req.method.as_str() {
                             "login" => {
                                 debug!("Worker {} - Accepting Login request", self.uuid());
@@ -449,7 +449,7 @@ impl Worker {
                                 if self.authenticated {
                                     // dont log in again, just say ok
                                     debug!("User already logged in: {}", self.user_id.clone());
-                                    self.send_ok(req.method);
+                                    self.send_ok(req.method).unwrap_or_else(|_|());
                                     return Ok(());
                                 }
                                 let params: Value = match req.params {
@@ -468,7 +468,7 @@ impl Worker {
                                 };
                                 let login_params: LoginParams = match serde_json::from_value(params) {
                                     Ok(p) => p,
-                                    Err(e) => {
+                                    Err(_) => {
                                         self.error = true;
                                         debug!("Worker {} - Invalid Login request parameters", self.uuid());
                                         return self.send_err(
@@ -492,7 +492,7 @@ impl Worker {
                                         self.status = WorkerStatus::new(self.uuid());
                                         self.set_difficulty(self.config.workers.port_difficulty.difficulty);
                                         self.set_next_difficulty(self.config.workers.port_difficulty.difficulty);
-                                        self.send_ok(req.method);
+                                        self.send_ok(req.method).unwrap_or_else(|_|());
                                     }
                                     Err(e) => {
                                         return self.send_err(
@@ -514,17 +514,17 @@ impl Worker {
                                     Result::Ok(share) => {
                            			    self.shares.push(share);
                                     }
-                                    Result::Err(err) => { }
+                                    Result::Err(_) => { }
                                 };
                             }
                             "status" => {
                                 trace!("Worker {} - Accepting status request", self.uuid());
                                 let status = self.status.clone();
-                                self.send_status(status);
+                                self.send_status(status).unwrap_or_else(|_|());
                             }
                             "keepalive" => {
                                 trace!("Worker {} - Accepting keepalive request", self.uuid());
-                                self.send_ok(req.method);
+                                self.send_ok(req.method).unwrap_or_else(|_|());
                             }
                             _ => {
                                 warn!(

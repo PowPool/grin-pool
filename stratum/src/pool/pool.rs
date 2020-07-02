@@ -54,7 +54,7 @@ fn accept_workers(
     let difficulty = config.workers.port_difficulty.difficulty;
     let listener = TcpListener::bind(address).expect("Failed to bind to listen address");
     let banned: HashMap<SocketAddr, Instant> = HashMap::new();
-    let mut rng = rand::thread_rng();
+    let rng = rand::thread_rng();
     // XXX TODO: Call the Redis api to get a list of banned IPs, refresh that list sometimes
     for stream in listener.incoming() {
         match stream {
@@ -75,7 +75,7 @@ fn accept_workers(
                         stream
                             .set_nonblocking(true)
                             .expect("set_nonblocking call failed");
-                        let mut worker = Worker::new(config.clone(), BufStream::new(stream));
+                        let worker = Worker::new(config.clone(), BufStream::new(stream));
                         debug!("add worker [{}:{}] into workers list", worker.uuid(), worker_addr.clone());
                         workers.lock().unwrap().insert(worker.uuid(), worker);
                         debug!("workers list size: {}", workers.lock().unwrap().len());
@@ -102,9 +102,9 @@ fn accept_workers(
 fn block_header(pre_pow: String,
                 edge_bits: u8,
                 nonce: u64,
-                mut proof: Vec<u64>
+                proof: Vec<u64>
         ) -> Result<BlockHeader, Error> {
-    let mut pv = grin_core::ser::ProtocolVersion(2);
+    let pv = grin_core::ser::ProtocolVersion(2);
     let mut header_bytes = from_hex(pre_pow)?;
     let mut nonce_bytes = ser_vec(&nonce, pv)?;
     header_bytes.append(&mut nonce_bytes);
@@ -300,7 +300,7 @@ impl Pool {
                 // trace!("{:?}", worker.worker_shares);
                 // Reset the workers current block stats
                 worker.reset_worker_shares(self.job.height);
-                worker.send_job(&mut self.job.clone());
+                worker.send_job(&mut self.job.clone()).unwrap_or_else(|_|());
             }
         }
     }
@@ -311,7 +311,7 @@ impl Pool {
         if self.job.pre_pow != self.server.job.pre_pow {
             trace!("accept_new_job for height {}, job_id {}", self.server.job.height, self.server.job.job_id);
             let new_height: bool = self.job.height != self.server.job.height;
-            let mut new_job = self.server.job.clone();
+            let new_job = self.server.job.clone();
 
             self.job = new_job;
             // debug!("accept_new_job broadcasting: {}", self.job.pre_pow.clone());
@@ -337,7 +337,7 @@ impl Pool {
             match worker.get_shares().unwrap() {
                 None => {}
                 Some(shares) => {
-                    for mut share in shares {
+                    for share in shares {
                         //  Check for duplicate or add to duplicate map
                         if self.duplicates.contains_key(&share.pow) {
                             // duplicated solution, ignore
@@ -350,7 +350,7 @@ impl Pool {
                             worker.status.rejected += 1;
                             worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
-                            worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502);
+                            worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502).unwrap_or_else(|_|());
                             continue; // Dont process this share anymore
                         } else {
                             self.duplicates.insert(share.pow.clone(), worker.user_id());
@@ -359,7 +359,7 @@ impl Pool {
                         if share.edge_bits != self.config.grin_pool.edge_bits {
                             // Invalid Size
                             worker.status.rejected += 1;
-                            worker.send_err("submit".to_string(), "Invalid POW size".to_string(), -32502);
+                            worker.send_err("submit".to_string(), "Invalid POW size".to_string(), -32502).unwrap_or_else(|_|());
                             continue; // Dont process this share anymore
                         }
 
@@ -368,7 +368,7 @@ impl Pool {
                         if share.pow.len() != PROOF_SIZE {
                             warn!("Share has invalid PROOF_SIZE");
                             worker.status.rejected += 1;
-                            worker.send_err("submit".to_string(), "Invalid PROOF_SIZE".to_string(), -32502);
+                            worker.send_err("submit".to_string(), "Invalid PROOF_SIZE".to_string(), -32502).unwrap_or_else(|_|());
                             continue; // Dont process this share anymore
                         }
                         // Check the height to see if its stale
@@ -378,7 +378,7 @@ impl Pool {
                             worker.status.stale += 1;
                             worker.add_shares(share.edge_bits, 0, 0, 1); // Accepted, Rejected, Stale
                             worker.add_shares_1m(share.edge_bits, 0, 0, 1); // Accepted, Rejected, Stale
-                            worker.send_err("submit".to_string(), "Solution submitted too late".to_string(), -32503);
+                            worker.send_err("submit".to_string(), "Solution submitted too late".to_string(), -32503).unwrap_or_else(|_|());
                             continue; // Dont process this share anymore
                         }
                         // Check if the pre-pow matches the job we sent - avoid "constructed solutions"
@@ -408,7 +408,7 @@ impl Pool {
                                             self.id,
                                             e
                                         );
-                                        worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502);
+                                        worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502).unwrap_or_else(|_|());
                                         continue; // Dont process this share anymore
 
                                     },
@@ -423,7 +423,7 @@ impl Pool {
                                             "{} - Rejected due to failed grin_core::pow::verify_size()",
                                             self.id,
                                         );
-                                        worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502);
+                                        worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502).unwrap_or_else(|_|());
                                         continue; // Dont process this share anymore
                                 }
                                 // For debugging - remove
@@ -445,14 +445,14 @@ impl Pool {
                             worker.status.rejected += 1;
                             worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
-                            worker.send_err("submit".to_string(), "Rejected low difficulty solution".to_string(), -32502);
+                            worker.send_err("submit".to_string(), "Rejected low difficulty solution".to_string(), -32502).unwrap_or_else(|_|());
                             continue; // Dont process this share anymore
                         }
                         if difficulty < worker.status.curdiff {
                             worker.status.rejected += 1;
                             worker.add_shares(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
                             worker.add_shares_1m(share.edge_bits, 0, 1, 0); // Accepted, Rejected, Stale
-                            worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502);
+                            worker.send_err("submit".to_string(), "Failed to validate solution".to_string(), -32502).unwrap_or_else(|_|());
                             continue; // Dont process this share anymore
                         }
                         if difficulty >= worker.status.curdiff {
@@ -460,7 +460,7 @@ impl Pool {
                             worker.status.totalwork += worker.status.curdiff;
                             worker.add_shares(share.edge_bits, 1, 0, 0); // Accepted, Rejected, Stale
                             worker.add_shares_1m(share.edge_bits, 1, 0, 0); // Accepted, Rejected, Stale
-                            worker.send_ok("submit".to_string());
+                            worker.send_ok("submit".to_string()).unwrap_or_else(|_|());
                         }
                         // This is a good share, send it to grin server to be submitted
                         // Only send high power shares - minimum difficulty is set by the upstream
@@ -468,7 +468,7 @@ impl Pool {
 
                         // meet difficulty requirement of job from upstream stratum server (mine pool or grin node)
                         if difficulty >= self.job.difficulty { // XXX TODO <---- this compares scaled to unscaled difficulty values - no good XXX TODO
-                            self.server.submit_share(&share.clone(), worker.uuid());
+                            self.server.submit_share(&share.clone(), worker.uuid()).unwrap_or_else(|_|());
                             warn!("{} - Submitted share at height {} with nonce {} with difficulty {} from worker {}",
                                 self.id,
                                 share.height,
@@ -510,7 +510,7 @@ impl Pool {
                 // Print this workers block_status for logstash to send to rmq
                 debug!("{:?}", worker.status);
                 debug!("{:?}", worker.worker_shares);
-                worker.send_job(&mut self.job.clone());
+                worker.send_job(&mut self.job.clone()).unwrap_or_else(|_|());
                 worker.reset_worker_shares(self.job.height);
             }
         }

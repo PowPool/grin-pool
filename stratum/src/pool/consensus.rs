@@ -36,6 +36,7 @@ const BASE_EDGE_BITS: u8 = 24;
 /// Compute weight of a graph as number of siphash bits defining the graph
 /// Must be made dependent on height to phase out smaller size over the years
 /// This can wait until end of 2019 at latest
+#[allow(dead_code)]
 pub fn graph_weight(height: u64, edge_bits: u8) -> u64 {
 	let mut xpr_edge_bits = edge_bits as u64;
 
@@ -64,6 +65,7 @@ impl Difficulty {
 	/// Computes the difficulty from a hash. Divides the maximum target by the
 	/// provided hash and applies the Cuck(at)oo size adjustment factor (see
 	/// https://lists.launchpad.net/mimblewimble/msg00494.html).
+	#[allow(dead_code)]
 	fn from_proof_adjusted(height: u64, proof: &Proof) -> Difficulty {
 		// scale with natural scaling factor
 		Difficulty::from_num(proof.scaled_difficulty(graph_weight(height, proof.edge_bits)))
@@ -77,6 +79,7 @@ impl Difficulty {
 	/// Same as `from_proof_adjusted` but instead of an adjustment based on
 	/// cycle size, scales based on a provided factor. Used by dual PoW system
 	/// to scale one PoW against the other.
+	#[allow(dead_code)]
 	fn from_proof_scaled(proof: &Proof, scaling: u32) -> Difficulty {
 		// Scaling between 2 proof of work algos
 		Difficulty::from_num(proof.scaled_difficulty(scaling as u64))
@@ -128,6 +131,7 @@ impl Eq for Proof {}
 
 impl Proof {
 	/// Builds a proof with provided nonces at default edge_bits
+	#[allow(dead_code)]
 	pub fn new(mut in_nonces: Vec<u64>, edge_bits: u8) -> Proof {
 		in_nonces.sort();
 		Proof {
@@ -161,6 +165,7 @@ impl Proof {
 	}
 
 	/// Maximum difficulty this proof of work can achieve
+	#[allow(dead_code)]
 	pub fn to_difficulty(&self, height: u64, sec_scaling: u32) -> Difficulty {
 		// 2 proof of works, Cuckoo29 (for now) and Cuckoo30+, which are scaled
 		// differently (scaling not controlled for now)

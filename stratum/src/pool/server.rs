@@ -326,7 +326,7 @@ impl Server {
                                     // Get the worker this response is for
                                     let worker_id = match res.id.parse::<String>() {
                                         Ok(id) => id,
-                                        Err(err) => {
+                                        Err(_) => {
                                             let e = RpcError {
                                                 code: -1,
                                                 message: "Invalid Worker ID".to_string(),
@@ -436,7 +436,6 @@ impl Server {
                                                 return Err(e);
                                             }
                                         };
-                                        return Ok(res.method.clone());
                                     }
                                     // This is a RESPONSE for a WORKER
                                     // There are no longer worker responses, we do all share validation
@@ -453,7 +452,7 @@ impl Server {
                             } // Not an error, just no messages for us right now
                         }
                     }
-                    Err(e) => {
+                    Err(_) => {
                         self.error = true;
                         let e = RpcError {
                             code: -32600,

@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
+// #[macro_use]
 use serde_derive;
 use std::fs::File;
 use std::io::prelude::*;
@@ -79,35 +79,35 @@ pub fn read_config() -> Config {
         Ok(difficulty) => {
             config.workers.port_difficulty.difficulty = difficulty.parse().unwrap() ;
         }
-        Err(e) => {}
+        Err(_) => {}
     }
 
     match env::var("EXPECT_SHARES") {
         Ok(expect_shares) => {
             config.workers.expect_shares_1m = expect_shares.parse::<u64>().unwrap();
         }
-        Err(e) => {}
+        Err(_) => {}
     }
 
     match env::var("GRIN_ADDRESS") {
         Ok(address) => {
             config.grin_node.address = address;
         }
-        Err(e) => {}
+        Err(_) => {}
     }
 
     match env::var("EDGE_BITS") {
         Ok(edge_bits) => {
             config.grin_pool.edge_bits = edge_bits.parse::<u32>().unwrap();
         }
-        Err(e) => {}
+        Err(_) => {}
     }
 
     match env::var("POOL") {
         Ok(pool) => {
             config.grin_pool.pool = pool.trim().to_string();
         }
-        Err(e) => {}
+        Err(_) => {}
     }
 
     println!("config: {:?}", config.clone());
