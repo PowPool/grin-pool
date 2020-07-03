@@ -32,9 +32,10 @@ use grin_core::core::BlockHeader;
 use grin_core::global::{ChainTypes, set_mining_mode};
 use grin_core::ser::{deserialize, ser_vec};
 
+
 use pool::config::{Config, NodeConfig, PoolConfig, WorkerConfig};
 use pool::proto::{JobTemplate, RpcError, SubmitParams, WorkerStatus};
-
+use pool::api::{accept_requests};
 use pool::server::Server;
 use pool::worker::{Worker, WorkerSharesStatPerMinute};
 use pool::consensus::Proof as MinerProof;
@@ -171,14 +172,18 @@ impl Pool {
     /// Run the Pool
     pub fn run(&mut self) {
         // Start a thread to listen on port and accept new worker connections
-        let mut workers_th = self.workers.clone();
-        // pool identity
-        let id_th = self.id.clone();
-        let config_th = self.config.clone();
+        let id1 = self.id.clone();
+        let config1 = self.config.clone();
+        let mut worker1 = self.workers.clone();
+        let _stratum_listener_th = thread::spawn(move || {
+            accept_workers(id1, config1, &mut worker1);
+        });
 
-        // deal the incoming connection
-        let _listener_th = thread::spawn(move || {
-            accept_workers(id_th, config_th, &mut workers_th);
+        let id2 = self.id.clone();
+        let config2 = self.config.clone();
+        let mut worker2 = self.workers.clone();
+        let _api_listener_th = thread::spawn(move || {
+            accept_requests(id2, config2, &mut worker2);
         });
 
         // Set default pool difficulty
@@ -636,4 +641,5 @@ impl Pool {
             }
         }
     }
+
 }

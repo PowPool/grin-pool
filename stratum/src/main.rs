@@ -18,6 +18,7 @@
 extern crate serde_derive;
 extern crate serde_json;
 extern crate bufstream;
+extern crate jsonrpc_http_server;
 #[macro_use]
 extern crate log;
 extern crate time;
