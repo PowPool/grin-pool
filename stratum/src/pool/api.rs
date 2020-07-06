@@ -9,27 +9,6 @@ use pool::worker::{Worker};
 use serde_json::{Map, to_value};
 
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct RespPoolInfo {
-    pub pool_id: String,
-    pub edge_bits: u32,
-    pub user_count: u64,
-    pub miner_count: u64,
-    pub connection_count: u64,
-}
-
-impl RespPoolInfo {
-    pub fn new() -> RespPoolInfo {
-        RespPoolInfo {
-            pool_id: "".to_string(),
-            edge_bits: 0,
-            user_count: 0,
-            miner_count: 0,
-            connection_count: 0,
-        }
-    }
-}
-
 pub fn accept_requests(
     stratum_id: String,
     config: Config,
@@ -95,3 +74,4 @@ pub fn accept_requests(
 
     server.wait();
 }
+
