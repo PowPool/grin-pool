@@ -413,6 +413,10 @@ impl Worker {
         return Ok(());
     }
 
+    pub fn get_peer_address(&mut self) -> String {
+        self.stream.get_mut().peer_addr().unwrap().clone().to_string()
+    }
+
     /// Get and process messages from the connected worker
     // Method to handle requests from the downstream worker
     pub fn process_messages(&mut self) -> Result<(), String> {
